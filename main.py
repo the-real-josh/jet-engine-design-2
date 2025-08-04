@@ -26,7 +26,7 @@ class Deflection:
     def __init__(self, V_inlet) -> None:
         self.V_inlet = V_inlet
         self.deflection_angle = None # PLACEHOLDER
-
+        self.initial_angle = 0
     def calc_deflection_angle(self):
         # calculate the deflection angle based on some principle
         self.deflection_angle = None  # PLACEHOLDER
@@ -48,8 +48,9 @@ class Deflection:
     def outlet_V(self):
         # calculate hte outlet velocity
         assert self.deflection_angle is not None, "you forgor to assign an angle 💀"
+        final_angle = self.initial_angle - self.deflection_angle
         np.tan(4)
-        self.V_outlet = np.array([self.V_inlet[1]*np.tan(self.deflection_angle),
+        self.V_outlet = np.array([self.V_inlet[1]*np.tan(final_angle),
                             self.V_inlet[1]])
         return self.V_outlet
 
@@ -91,9 +92,12 @@ class TurbineStageStreamline:
         h0_between = h0_inlet - h0_inlet
 
         # adjust the velocity to be in the frame of the rotor
-        rotor_inlet_relative_V = IGV_outlet_V + V_blade
+
+        # TODO: heavily scrutinize lines 97-102!!!!!
+        rotor_inlet_relative_V = IGV_outlet_V - V_blade
         d_r = Deflection(V_inlet=rotor_inlet_relative_V)
-        d_r.input_deflection_angle(np.arccos(np.dot(IGV_outlet_V)))
+        theta_initial = np.atan2(rotor_inlet_relative_V[0], rotor_inlet_relative_V[1])
+        d_r.input_deflection_angle(theta_initial - np.arctan(V_blade[0] / (rotor_inlet_relative_V[0])))
         outlet_V_relative = d_r
         outlet_V = outlet_V_relative - V_blade
 
