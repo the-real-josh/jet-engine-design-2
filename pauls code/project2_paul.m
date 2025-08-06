@@ -3,58 +3,59 @@ R = 287; % J/kg K
 cp = 1148; % J/kg-K for gas
 gamma = 1.3333;
 
-m_flow = 20; % kg/s mass flow
-eta_t = 0.9; % isentropic eff
-T01 = 1100; % K inlet temp
-delta_T0s  = 145; % K temp drop T01-T03
-pressureRatio = 1.873; % p01/p03
-p01 = 400000; % Pa = 4bar
+m_flow =8; % kg/s mass flow
+eta_t = 0.88; % isentropic eff (not used in ex)-
+T01 = 1173; % K inlet temp
 
+pressureRatio = 2.16; % p01/p03
+p01 = 476300; % Pa
 p03 = p01/pressureRatio;
 
-N = 250; % rev/s rotational speed
-U = 340; % m/s mean blade speed
+Power = 1.7 * 10^6; % Watts
+%T03 =  T01 * (p03/p01)^((gamma-1)/gamma) ;  
+TW = Power/m_flow;
+T03 = T01 - TW/cp;
+delta_T0s  = (T01 - T03) * eta_t;
 
-lambda_N = 0.05; %nozzle loss coefficient 
+N = 25650/60; % rev/s rotational speed
+%assume typical hub to tip ratio with OD 0.4 (0.4 from previous project)
+ht_ratio = 0.35;%0.4
+OD = 0.4;
+hub_dia = ht_ratio * OD;
+rm = 1/2 * (OD + hub_dia)/2;  %*********
 
-phi = 0.8; %flow coeff
-alpha3 = 10; % swirl
+
+U = N * 2*pi* rm;
+%U = 340; % m/s mean blade speed         
+
+lambda_N = 0.05; %nozzle loss coefficient first guess **********
+
+phi = 0.8; %flow coeff          **********
+alpha3 = 10; % swirl - changed from 0 earlier          **********
 
 alpha1m = 0 ; % from page 16
-alpha1 = 0; %page 27
+alpha1 = 0; 
+
 thickChord = 0.2 ; % page 24, thickness chord ratio t/c
 teThickPitch = 0.02; % trailing edge thickness / pitch ratio. te/s
 
-if strcmp(blades, 'shrouded')
- 
-
 B = 0.5; % check assumption
 
- 
-
-psi = 2*cp*delta_T0s / U^2; % temp drop coeff
-
+psi = 2*cp*delta_T0s / U^2; % temp drop coeff 
 % psi = 2*phi*(tan(beta2)+(tan(beta3)));
 
-beta3 = atand(tand(alpha3) + 1/phi);
+beta3 = atand(tand(alpha3) + 1/phi); 
 
- 
-
-Lambda = phi*tand(beta3) - psi/4; % degree of reaction
+Lambda = phi*tand(beta3) - psi/4 % degree of reaction
 
 beta2 = atand(1/(2*phi)*(.5*psi - 2*Lambda));
-
-alpha2 = atand(tand(beta2) + 1/phi);
-
- 
+alpha2 = atand(tand(beta2) + 1/phi); 
 
 Ca2 = U*phi;
 C2 = Ca2/cosd(alpha2);
 
 T02=T01;
-
-T2 = -C2^2/(2*cp) + T02; 
-
+T2 = -C2^2/(2*cp) + T02;  
 T2Prime = T2 - lambda_N * C2^2/(2*cp);
 
 p2 = p01*(T2Prime/T01)^(gamma/(gamma-1)); %using isentropic relation
@@ -65,7 +66,7 @@ rho2 = p2/(R*T2);
 A2 = m_flow/(rho2*Ca2); % annulus area at plane 2
 
 %throat areas of nozzles
-A2N = m_flow/(rho2*C2); 
+A2N = m_flow/(rho2*C2);
 
 Ca3 = Ca2;
 Ca = Ca2;
@@ -80,24 +81,22 @@ rho1 = p1/(R*T1);
 A1 = m_flow/(rho1*Ca1);
 
 %at outlet
-T03 = T01 - delta_T0s;
-
-T3 = T03 - KE; % noting that C1 = C3
-
+%T03 = T01 - delta_T0s;
+T3 = T03 - KE; % noting that C1 = C3 
 p3 = p03*(T3/T03)^(gamma/(gamma-1));
 rho3 = p3/(R*T3);
 A3 = m_flow/(rho3*Ca3);
 
 % m suffix indicates mean diameter
-Um=340;
-rm = Um/(2*pi*N);
+Um=U;
+%rm = Um/(2*pi*N);
 
-A = [0.0626 0.0833 0.1047]; % three stations
+A = [A1 A2 A3]; % three stations
 
 h = A*N/Um; % height
-r_ratio = (rm + h/2)./(rm - h/2);
+r_ratio = (rm + h/2)./(rm - h/2)
 
-M3 = C3 / sqrt(gamma*R*T3); 
+M3 = C3 / sqrt(gamma*R*T3);
 
 %% Relating ψ, Ø and the gas angles, are not valid when Ca3 ≠ Ca2
 psi = 2*Ca2/U * (tand(beta2) + Ca3/Ca2 * tand(beta3));
@@ -111,12 +110,12 @@ lambda_R = (T3-T3doublePrime)/(V3^2 / (2*cp));
 %page 12
 Cw2 = Ca2 * tand(alpha2); % = const
 rr = rm - h/2 ;
-rt = rm + h/2; 
+rt = rm + h/2;
 
 alpha2m = alpha2; %from assumptions on 2 to top of 13. Taken at mean radius
 beta2m = beta2;
 alpha3m = alpha3;
-beta3m = beta3; 
+beta3m = beta3;
 
 alpha2_tip = atand(rm / rt(2) * tand(alpha2m));
 alpha2_root = atand(rm / rr(2) * tand(alpha2m));
@@ -127,16 +126,12 @@ beta2_root = atand(rm / rr(2) * tand(alpha2m) - rr(2)/rm * Um / Ca2);
 alpha3_tip = atand(rm / rt(3) * tand(alpha3m));
 alpha3_root = atand(rm / rr(3) * tand(alpha3m));
 
-beta3_tip = atand(rm / rt(3) * tand(alpha3m) + rt(3)/rm * Um / Ca3);
-
+beta3_tip = atand(rm / rt(3) * tand(alpha3m) + rt(3)/rm * Um / Ca3); 
 beta3_root = atand(rm / rr(3) * tand(alpha3m) + rr(3)/rm * Um / Ca3);
 
 V2r = Ca2 * secd(beta2_root);
 C2r = Ca2* secd(alpha2_root);
 
- 
-
- 
 
 T2r = T02 - C2r^2 / (2*cp) ;
 Mv2_r = V2r/ sqrt(gamma*R*T2r);
@@ -144,130 +139,83 @@ Mv2_r = V2r/ sqrt(gamma*R*T2r);
 %% Internal losses
 %page 16
 
-pitchChordN = 0.86 ;% (s/c)n from chart
-pitchChordR = 0.83;
+pitchChordN = 0.89 ;% (s/c)n from chart page 16 
+pitchChordR = 0.86;
 
 hN = 1/2 * (h(1) + h(2));% mean nozzle height
-hR = 1/2 * (h(2) + h(3)); % mean rotor blade height 
+hR = 1/2 * (h(2) + h(3)); % mean rotor blade height
 
 h_c = 3; % aspect ratio h/c page 17
 cN = hN / h_c;
 cR = hR / h_c;
 
 sN = cN * pitchChordN; %pitch
-sR = cR * pitchChordR; 
+sR = cR * pitchChordR;
 
-nN = floor(2*pi*rm/sN); % number of blades nozzle - in example got slighltly smaller number of blades than prof
-nR = floor(2*pi*rm/sR);
+nN = round(2*pi*rm/sN); % number of blades nozzle - in example got slighltly smaller number of blades than prof
+nR = round(2*pi*rm/sR);
 
 if isprime(nR)
-
     fprintf('number of rotor blades is prime! Yay! \n')
-
-else
-
+else 
     fprintf('check nR and sR \n')
-
 end
+%in this situation nR came to be 80, adjust to 79. 
 
 if mod(nN, 2) == 0
-
     fprintf('number of nozzle blades is even! Yay! \n')
-
 else
-
     fprintf('check nN and sN \n')
-
 end
 
-rho_b = 8000; % kg/m^3 given in page 19
+rho_b = 8440; % kg/m^3 Inco 625     **********
 Area = 1/2 * (A2 + A3);
 sigma_ct_max = 4/3 * pi * N^2 * rho_b * Area;
 
 %% Estimation of Design Point Performance
 
-Yp_N = 0.024; % estimated / interpolated from graphs on page 23? Check
-
-Yp_R = 0.032;
-
- 
+Yp_N = 0.024; % from graph on pg 23
+Yp_beta0 = 0.025;
+Yp_betabeta = 0.95;
+Yp_R = (Yp_beta0 + (beta2/beta3)^2 * ( Yp_betabeta - Yp_beta0))* (thickChord/.2)^(beta2/beta3);
 
 %for nozzle
 
- 
-
-blades = 'shrouded' ; % or 'unshrouded'
-
+blades = 'unshrouded' ; % or 'unshrouded'
 if strcmp(blades, 'shrouded')
-
     k_h = 0; % k/h
-
 elseif strcmp(blades, 'unshrouded')
-
-    k_h = 0.02;
-
+    k_h = 0.01; 
 end
-
- 
 
 betam = atand((tand(beta3) - tand(beta2))/2);
-
 %secondaryLossParameter = (A2* cosd(alpha2)/ (A1* cosd(alpha1)))^2 / (1+ mean(rr(1:2)./rt(1:2))); % page 27
+lambda = 0.011; % from graph on pg 26
 
-lambda = 0.012; % from graph on pg 26
-
- 
-
-alpham = atand((tand(alpha2) - tand(alpha1))/2) ;
-
+alpham = atand((tand(alpha2) - tand(alpha1))/2) ; 
 CL_s_c = 2*(tand(alpha1) + tand(alpha2)) * cosd(alpham); %CL/ (s/c)
-
 YsYk_N = (lambda + B*k_h)* CL_s_c^2 * cosd(alpha2)^2 / cosd(alpham)^3; % Ys+Yk
 
- 
-
-%for rotor bladdes the secondary loss parameter would be
-
+%for rotor bladdes the secondary loss parameter would be 
 %secondaryLossParameter = (A3* cosd(beta3)/ (A2* cosd(beta2)))^2 / (1+ mean(rr(2:3)./rt(2:3)));
-
-lambda = 0.015 ; %from graph
-
+lambda = 0.021 ; %from graph
 CL_s_c = 2*(tand(beta3) + tand(beta2)) * cosd(betam);
 
- 
-
 blades = 'unshrouded' ; % or 'unshrouded'
-
 if strcmp(blades, 'shrouded')
-
     k_h = 0; % k/h
-
 elseif strcmp(blades, 'unshrouded')
-
-    k_h = 0.02;
-
+    k_h = 0.02; 
 end
-
- 
 
 YsYk_R = (lambda + B*k_h)* CL_s_c^2 * cosd(beta3)^2 / cosd(betam)^3;
 
- 
-
 %total loss coefficients
-
 YN = Yp_N + YsYk_N ;
-
 YR = Yp_R + YsYk_R ;
 
- 
-
 lambda_N = YN/(T02/T2Prime);
-
 T03Rel = T3 + V3^2/(2*cp);
-
 lambda_R = YR / (T03Rel / T3doublePrime);
-
- 
 
 eta_s = 1 / (1 + 1/2*Ca/U * ((lambda_R*secd(beta3)^2 + T3/T2 * lambda_N*secd(alpha2)^2)/(tand(beta3) + tand(alpha2) - U/Ca)));
