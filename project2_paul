@@ -1,0 +1,171 @@
+
+R = 287; % J/kg K
+cp = 1148; % J/kg-K for gas
+gamma = 1.3333;
+
+m_flow = 20; % kg/s mass flow
+eta_t = 0.9; % isentropic eff
+T01 = 1100; % K inlet temp
+delta_T0s  = 145; % K temp drop T01-T03
+pressureRatio = 1.873; % p01/p03
+p01 = 400000; % Pa = 4bar 
+p03 = p01/pressureRatio;
+
+N = 250; % rev/s rotational speed
+U = 340; % m/s mean blade speed
+
+lambda_N = 0.05; %nozzle loss coefficient
+
+phi = 0.8; %flow coeff
+alpha3 = 10; % swirl
+
+alpha1m = 0 ; % from page 16
+
+thickChord = 0.2 ; % page 24, thickness chord ratio t/c
+teThickPitch = 0.02; % trailing edge thickness / pitch ratio. te/s
+
+blades = 'shrouded' ; % or 'unshrouded'
+if strcmp(blades, 'shrouded')
+    B = 0.25;
+elseif strcmp(blades, 'unshrouded')
+    B = 0.5;
+end
+
+
+psi = 2*cp*delta_T0s / U^2; % temp drop coeff 
+% psi = 2*phi*(tan(beta2)+(tan(beta3)));
+
+beta3 = atand(tand(alpha3) + 1/phi); 
+
+Lambda = phi*tand(beta3) - psi/4; % degree of reaction
+
+beta2 = atand(1/(2*phi)*(.5*psi - 2*Lambda));
+alpha2 = atand(tand(beta2) + 1/phi); 
+
+Ca2 = U*phi;
+C2 = Ca2/cosd(alpha2);
+
+T02=T01;
+T2 = -C2^2/(2*cp) + T02;  
+T2Prime = T2 - lambda_N * C2^2/(2*cp);
+
+p2 = p01*(T2Prime/T01)^(gamma/(gamma-1)); %using isentropic relation
+pc = p01*((gamma+1)/2)^-(gamma/(gamma-1)); %from critical pressure ratio
+
+rho2 = p2/(R*T2);
+
+A2 = m_flow/(rho2*Ca2); % annulus area at plane 2
+
+%throat areas of nozzles
+A2N = m_flow/(rho2*C2);
+
+Ca3 = Ca2;
+Ca = Ca2;
+Ca1 = Ca3/cosd(alpha3);
+C1=Ca1;
+C3=C1;
+
+KE = C1^2/(2*cp);%The temperature equivalent of the inlet (and outlet) kinetic energy
+T1 = T01 - KE;
+p1 = p01*(T1/T01)^(gamma/(gamma-1));
+rho1 = p1/(R*T1);
+A1 = m_flow/(rho1*Ca1);
+
+%at outlet
+T03 = T01 - delta_T0s;
+T3 = T03 - KE; % noting that C1 = C3 
+p3 = p03*(T3/T03)^(gamma/(gamma-1));
+rho3 = p3/(R*T3);
+A3 = m_flow/(rho3*Ca3);
+
+% m suffix indicates mean diameter
+Um=340;
+rm = Um/(2*pi*N);
+
+A = [0.0626 0.0833 0.1047]; % three stations
+
+h = A*N/Um; % height
+r_ratio = (rm + h/2)./(rm - h/2);
+
+M3 = C3 / sqrt(gamma*R*T3);
+
+%% Relating ψ, Ø and the gas angles, are not valid when Ca3 ≠ Ca2
+psi = 2*Ca2/U * (tand(beta2) + Ca3/Ca2 * tand(beta3));
+
+T3doublePrime = T2 / (p2/p3)^((gamma-1)/gamma);
+
+V3 = Ca3/ cosd(beta3);
+lambda_R = (T3-T3doublePrime)/(V3^2 / (2*cp));
+
+%% vortex theory
+%page 12
+Cw2 = Ca2 * tand(alpha2); % = const
+rr = rm - h/2 ;
+rt = rm + h/2;
+
+alpha2m = alpha2; %from assumptions on 2 to top of 13. Taken at mean radius
+beta2m = beta2;
+alpha3m = alpha3;
+beta3m = beta3;
+
+alpha2_tip = atand(rm / rt(2) * tand(alpha2m));
+alpha2_root = atand(rm / rr(2) * tand(alpha2m));
+
+beta2_tip = atand(rm / rt(2) * tand(alpha2m) - rt(2)/rm * Um / Ca2); %assume slight difference due to rounding error
+beta2_root = atand(rm / rr(2) * tand(alpha2m) - rr(2)/rm * Um / Ca2);
+
+alpha3_tip = atand(rm / rt(3) * tand(alpha3m));
+alpha3_root = atand(rm / rr(3) * tand(alpha3m));
+
+beta3_tip = atand(rm / rt(3) * tand(alpha3m) + rt(3)/rm * Um / Ca3); 
+beta3_root = atand(rm / rr(3) * tand(alpha3m) + rr(3)/rm * Um / Ca3);
+
+V2r = Ca2 * secd(beta2_root);
+C2r = Ca2* secd(alpha2_root);
+
+
+T2r = T02 - C2r^2 / (2*cp) ;
+Mv2_r = V2r/ sqrt(gamma*R*T2r);
+
+%% Internal losses
+%page 16
+
+pitchChordN = 0.86 ;% (s/c)n from chart
+pitchChordR = 0.83;
+
+hN = 1/2 * (h(1) + h(2));% mean nozzle height
+hR = 1/2 * (h(2) + h(3)); % mean rotor blade height
+
+h_c = 3; % aspect ratio h/c page 17
+cN = hN / h_c;
+cR = hR / h_c;
+
+sN = cN * pitchChordN; %pitch
+sR = cR * pitchChordR;
+
+nN = floor(2*pi*rm/sN); % number of blades nozzle - in example got slighltly smaller number of blades than prof
+nR = floor(2*pi*rm/sR);
+
+if isprime(nR)
+    fprintf('number of rotor blades is prime! Yay!')
+else 
+    fprintf('check nR and sR')
+end
+
+if mod(nN, 2) == 0
+    fprintf('number of nozzle blades is even! Yay!')
+else
+    fprintf('check nN and sN')
+end
+
+rho_b = 8000; % kg/m^3 given in page 19
+Area = 1/2 * (A2 + A3);
+sigma_ct_max = 4/3 * pi * N^2 * rho_b * Area;
+
+%% Estimation of Design Point Performance
+
+Yp_N = 0.024; % estimated / interpolated from graphs on page 23? Check 
+Yp_R = 0.032; 
+
+betam = atand((tand(beta3) - tand(beta2))/2);
+
