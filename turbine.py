@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 norm = np.linalg.norm
+dict_2_printable = lambda k: '\n'.join([f'{keys}: {vals}' for keys,vals in zip(k.keys(), k.values())])
 
 
 class Gas:
@@ -194,9 +195,12 @@ def main():
     # perform calculation
     stage.run_meanline_design()
 
-    print("Velocities: ", stage.get_velocities())
-    print("Geometry: ", stage.get_geometry())
-    print("Thermodynamics: ", stage.get_thermo())
+    print(f'velocities:-----------\n'
+          f'{dict_2_printable(stage.get_velocities())}\n\n'
+          f'geometry:-------------\n'
+          f'{dict_2_printable(stage.get_geometry())}\n\n'
+          f'Thermodynamics:-------\n'
+          f'{dict_2_printable(stage.get_thermo())}\n\n')
 
 
 if __name__ == "__main__":
