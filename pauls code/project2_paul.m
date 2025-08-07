@@ -205,7 +205,7 @@ blades = 'unshrouded' ; % or 'unshrouded'
 if strcmp(blades, 'shrouded')
     k_h = 0; % k/h
 elseif strcmp(blades, 'unshrouded')
-    k_h = 0.02; 
+    k_h = 0.01; 
 end
 
 YsYk_R = (lambda + B*k_h)* CL_s_c^2 * cosd(beta3)^2 / cosd(betam)^3;
