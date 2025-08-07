@@ -147,7 +147,7 @@ class TurbineStageStreamline:
         self.A2 = None
         self.T03 = None
         self.delta_T0s = None
-    
+        self.radius_ratios = None
     def run_meanline_design(self):
         
         # power and energy calculations
@@ -222,28 +222,35 @@ class TurbineStageStreamline:
 
         # mean radius values
         self.r_m = self.rm
-        self.h = self.A * (self.RPM / 60) / self.U # Blade heights at stations 1, 2, 3
+        # blade heights at each station (1 = stator inlet, 2 = rotor inlet, 3 = turbine outlet)
+        self.h = self.A * (self.RPM / 60) / self.U
 
-        # root and tip radii at station 2 (rotor inlet)
-        self.r_r = self.r_m - self.h[1] / 2 # root
-        self.r_t = self.r_m + self.h[1] / 2 # tip
+        # root and tip radii at all stations
+        self.r_r = [self.r_m - h / 2 for h in self.h] # root radii [r_r1, r_r2, r_r3]
+        self.r_t = [self.r_m + h / 2 for h in self.h] # tip radii [r_t1, r_t2, r_t3]
 
-        # free vortex calculations
-        self.alpha2_root = np.rad2deg(np.arctan((self.r_m/self.r_r) * np.tan(np.deg2rad(self.alpha2))))
-        self.alpha2_tip = np.rad2deg(np.arctan((self.r_m/self.r_t) * np.tan(np.deg2rad(self.alpha2))))
+        # free vortex calculations at rotor inlet (station 2)
 
-        self.beta2_root = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha2_root)) - (self.r_r / self.r_m) * (1 / self.phi)))
-        self.beta2_tip = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha2_tip)) - (self.r_t / self.r_m) * (1 / self.phi)))
+        self.alpha2_root = np.rad2deg(np.arctan((self.r_m/self.r_r[1]) * np.tan(np.deg2rad(self.alpha2))))
+        self.alpha2_tip = np.rad2deg(np.arctan((self.r_m/self.r_t[1]) * np.tan(np.deg2rad(self.alpha2))))
 
-        # similarly for outlet angles
-        self.alpha3_root = np.rad2deg(np.arctan((self.r_m / self.r_r) * np.tan(np.deg2rad(self.alpha3))))
-        self.alpha3_tip = np.rad2deg(np.arctan((self.r_m / self.r_t) * np.tan(np.deg2rad(self.alpha3))))
+        self.beta2_root = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha2_root)) - (self.r_r[1] / self.r_m) * (1 / self.phi)))
+        self.beta2_tip = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha2_tip)) - (self.r_t[1] / self.r_m) * (1 / self.phi)))
 
-        self.beta3_root = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha3_root)) + (self.r_r / self.r_m) * (1 / self.phi)))
-        self.beta3_tip = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha3_tip)) + (self.r_t / self.r_m) * (1 / self.phi)))
+        # similarly for outlet angles (station 3)
+
+        self.alpha3_root = np.rad2deg(np.arctan((self.r_m / self.r_r[2]) * np.tan(np.deg2rad(self.alpha3))))
+        self.alpha3_tip = np.rad2deg(np.arctan((self.r_m / self.r_t[2]) * np.tan(np.deg2rad(self.alpha3))))
+
+        self.beta3_root = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha3_root)) + (self.r_r[2] / self.r_m) * (1 / self.phi)))
+        self.beta3_tip = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha3_tip)) + (self.r_t[2] / self.r_m) * (1 / self.phi)))
 
         # check reaction at root
         self.Lambda_root = 1 - (np.tan(np.deg2rad(self.alpha2_root)) + np.tan(np.deg2rad(self.alpha3_root))) * self.phi / 2
+
+         # Additional useful calculations
+        self.radius_ratios = [rt/rr for rt,rr in zip(self.r_t, self.r_r)]  # [rt/rr]_1, [rt/rr]_2, [rt/rr]_3
+        self.annulus_flare_angle = np.rad2deg(np.arctan((self.r_t[2]-self.r_t[0])/(self.h[1]*3)))  # approx flare angle
 
     def calc_blade_params(self):
         """Calculate blade pitch, chord, and number of blades"""
@@ -273,7 +280,7 @@ class TurbineStageStreamline:
         self.n_R = int(2 * np.pi * self.r_m / s_R) # rotor blades
 
         # ensure prime number for rotor blades to avoid vibration
-        if not self.is_prime(self.n_R):
+        if not TurbineStageStreamline.is_prime(self.n_R):
             self.n_R = self.find_next_prime(self.n_R)
 
     def calc_losses(self):
@@ -295,6 +302,18 @@ class TurbineStageStreamline:
         self.Y_N = self.Y_p_N + 0.014 * (C_L_N / self.s_c_N)**2 # stator
         self.Y_R = self.Y_p_R + 0.014 * (C_L_R / self.s_c_R)**2 + self.Y_k # rotor
 
+        # calculate relative velocities and temperatures
+        V2 = self.Ca2 / np.cos(np.deg2rad(self.beta2))  # Relative velocity at rotor inlet
+        V3 = self.Ca3 / np.cos(np.deg2rad(self.beta3))  # Relative velocity at rotor outlet
+        
+        # relative total temperatures
+        self.T02_rel = self.T01 - (self.C1**2 - V2**2)/(2*self.cp)  # Rotor inlet
+        self.T03_rel = self.T03 - (self.C3**2 - V3**2)/(2*self.cp)  # Rotor outlet
+        
+        # store relative velocities
+        self.V2_rel = V2
+        self.V3_rel = V3
+
         # convert to temperature-based coefficients
         self.lambda_N = self.Y_N / (self.T01 / self.T2)
         self.lambda_R = self.Y_R / (self.T03_rel / self.T3)
@@ -307,7 +326,7 @@ class TurbineStageStreamline:
 
     # helper functions
     @staticmethod
-    def is_prime(self, n):
+    def is_prime(n):
         """Helper function: Check if current number is prime number"""
         if n <= 1:
             return False
@@ -317,12 +336,15 @@ class TurbineStageStreamline:
         return True
 
     @staticmethod
-    def find_next_prime(self, n):
+    def find_next_prime(n):
         """Helper function: If current number isn't prime, find next closest prime number"""
         while True:
             n += 1
-            if self.is_prime(n):
+            if TurbineStageStreamline.is_prime(n):
                 return n 
+
+    # getter functions for outputting data
+
 
     def get_velocities(self):
         return {
@@ -338,17 +360,22 @@ class TurbineStageStreamline:
             "hub_diameter" : f"{self.hub_dia:.2f}",
             "mean_radius" : f"{self.rm:.2f}",
             "U" : f"{self.U:.2f}",
-            "annulus_area" : f"{self.A2:.2f}"
+            "annulus_area" : f"{self.A2:.2f}",
+            "flare_angle": f"{self.annulus_flare_angle:.1f} deg"
         }
     
     def get_thermo(self):
-        return{
-            "T01" : f"{self.T01:.2f}",
-            "T03" : f"{self.T03:.2f}",
-            "p01" : f"{self.p01:.2f}",
-            "p03" : f"{self.p03:.2f}",
-            "delta_T0s" : f"{self.delta_T0s:.2f}",
-            "DRXN" : f"{self.Lambda:.2f}"
+        """Returns thermodynamic properties at all stations"""
+        return {
+            "Plane": ["1", "2", "3"],
+            "pressure [bar]": [f"{self.p1/1e5:.3f}", f"{self.p2/1e5:.3f}", f"{self.p3/1e5:.3f}"],
+            "temperature [K]": [f"{self.T1:.1f}", f"{self.T2:.1f}", f"{self.T3:.1f}"],
+            "density [kg/m³]": [f"{self.rho1:.3f}", f"{self.rho2:.3f}", f"{self.rho3:.3f}"],
+            "annulus area [m²]": [f"{self.A1:.4f}", f"{self.A2:.4f}", f"{self.A3:.4f}"],
+            "mean radius [m]": [f"{self.rm:.3f}", f"{self.rm:.3f}", f"{self.rm:.3f}"],
+            "tip to root radius ratios": [f"{self.radius_ratios[0]:.2f}", f"{self.radius_ratios[1]:.2f}", f"{self.radius_ratios[2]:.2f}"],
+            "blade height [m]": [f"{self.h[0]:.4f}", f"{self.h[1]:.4f}", f"{self.h[2]:.4f}"]
+
         }
     
     def get_radial_equil(self):
@@ -420,8 +447,11 @@ def main():
         pressureRatio=pressureRatio,
         RPM = RPM
     )
-    # perform calculation
+    # perform calculations
     stage.run_meanline_design()
+    stage.calc_radial_equilibrium()
+    stage.calc_blade_params()
+    stage.calc_losses()
     print(f'velocities:-----------\n'
           f'{dict_2_printable(stage.get_velocities())}\n\n'
           f'geometry:-------------\n'
