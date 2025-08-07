@@ -269,8 +269,16 @@ class TurbineStageStreamline:
     def calc_losses(self):
         """Calculate profile, secondary, and tip clearance losses"""
         # profile losses (simplified)
-        self.Y_p_N = 0.024 # from correlation for stator
-        self.Y_p_R = 0.032 # from correlation for rotor
+        sc = self.s_N / self.c_N
+        beta = self.beta2
+
+
+        import reference.curve_fit
+        am_nozz = reference.curve_fit.AM_nozzle()
+        am_imp = reference.curve_fit.AM_impulse()
+
+        self.Y_p_N = am_nozz.nozzle_Y(sc, beta) # from correlation for stator
+        self.Y_p_R = am_nozz.nozzle_Y(sc, beta) # from correlation for rotor
 
         # secondary losses
         self.C_L_N = 2 * (self.s_c_N) * (np.tan(np.deg2rad(self.alpha2))) * np.cos(np.deg2rad(self.alpha2))
