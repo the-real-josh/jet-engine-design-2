@@ -55,8 +55,9 @@ class AM:
         data = np.array(data)
         print(f'shape of the data: {np.shape(data)}')
 
-        self.sc = sc
         self.Yp_funcs = Yp_funcs
+        self.sc = sc
+        self.beta = beta
         self.Yp = Yp
 
         # conduct the regression
@@ -90,24 +91,23 @@ class AM:
         new_point = np.array([[sc, beta]])
         new_points_poly = self.poly.transform(new_point)
         z_new = self.model.predict(new_points_poly)
-        print(z_new)
         return z_new
         
-    # def compare_2d_y_slices(self):
-    #     # cross section at 65 degrees
+    def compare_2d_y_slices(self):
+        # cross section at 65 degrees
 
-    #     for ang, sc in zip(np.deg2rad(np.array([80, 75, 70, 65, 60, 50, 40], dtype=float)), self.sc):
-    #         Y_p = [self.f_nozz(sc[i], ang) for i in range(len(sc))]
-    #         plt.plot(sc, Y_p, color='r') # evaluation of 3d function in slices
-    #         plt.title(f'cross section {np.rad2deg(ang)} degrees')
+        for ang, sc in zip(np.deg2rad(np.array([80, 75, 70, 65, 60, 50, 40], dtype=float)), self.sc):
+            Y_p = [self.nozzle_Y(sc[i], ang) for i in range(len(sc))]
+            plt.plot(sc, Y_p, color='r') # evaluation of 3d function in slices
+            plt.title(f'cross section {np.rad2deg(ang)} degrees')
 
-    #     angs = np.array([80, 75, 70, 65, 60, 50, 40])
-    #     for i, sc in zip(range(7), self.sc):
-    #         Y_p = [self.Yp_funcs[i](sc[j]) for j in range(len(sc))]
-    #         plt.plot(sc, Y_p, color='g')        # 2d functions evaluated
-    #         plt.plot(sc, self.Yp[i], color='b') # points used to make the 3d interpolation function
-    #         plt.title(f'cross section {angs[i]} degrees')
-    #     plt.show()
+        angs = np.array([80, 75, 70, 65, 60, 50, 40])
+        for i, sc in zip(range(7), self.sc):
+            Y_p = [self.Yp_funcs[i](sc[j]) for j in range(len(sc))]
+            plt.plot(sc, Y_p, color='g')        # 2d functions evaluated
+            plt.plot(sc, self.Yp[i], color='b') # points used to make the 3d interpolation function
+            plt.title(f'cross section {angs[i]} degrees')
+        plt.show()
 
     def test_plot_3d_y(self):
         plt.style.use('_mpl-gallery')
@@ -126,13 +126,13 @@ class AM:
         print(f'shape of the data: {np.shape(test_data)}')
 
         new_points_poly = self.poly.transform(test_data)
-        Y_p = self.model.predict(new_points_poly)
+        Y_p = np.array(self.model.predict(new_points_poly)).reshape(np.shape(test_sc))
 
         fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         ax.plot_surface(test_sc, test_beta, Y_p)    # type: ignore
 
         # Plot the 2d polyfits
-        ax.plot_surface(sc, beta, Yp, vmin=Yp.min() * 2, cmap=cm.Blues) # type: ignore
+        ax.plot_surface(self.sc, self.beta, self.Yp, vmin=self.Yp.min() * 2, cmap=cm.Blues) # type: ignore
         ax.set(xticklabels=[],
             yticklabels=[],
             zticklabels=[])
@@ -142,5 +142,5 @@ class AM:
 
 am = AM()
 am.nozzle_Y(0.5, np.deg2rad(80))
-am.test_plot_3d_y()
+am.compare_2d_y_slices()
 # am.compare_2d_y_slices()
