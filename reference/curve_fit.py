@@ -147,13 +147,12 @@ class AM_impulse:
 
 
         # get the data points
-        sc = np.array([np.linspace(0.30, 1.00),    # z = 80 degrees
-                       np.linspace(0.30, 1.00),    # z = 75 degrees
-                       np.linspace(0.30, 1.00),    # z = 70 degrees
-                       np.linspace(0.30, 1.00),    # z = 65 degrees
-                       np.linspace(0.30, 1.00),    # z = 60 degrees
-                       np.linspace(0.36, 1.00),    # z = 50 degrees
-                       np.linspace(0.36, 1.00)])   # z = 40 degrees
+        sc = np.array([np.linspace(0.30, 1.00),   # 70 degrees
+                       np.linspace(0.30, 1.00),   # 65 degrees
+                       np.linspace(0.30, 1.00),   # 60 degrees
+                       np.linspace(0.30, 1.00),   # 55 degrees
+                       np.linspace(0.36, 1.00),   # 50 degrees
+                       np.linspace(0.36, 1.00)])  # 40 degrees
 
         beta = np.array([[np.deg2rad(70) for i in range(50)],
                          [np.deg2rad(65) for i in range(50)],
@@ -225,7 +224,7 @@ class AM_impulse:
             plt.title(f'cross section {np.rad2deg(ang)} degrees')
 
         angs = np.array([80, 75, 70, 65, 60, 50, 40])
-        for i, sc in zip(range(7), self.sc):
+        for i, sc in zip(range(6), self.sc):
             Y_p = [self.Yp_funcs[i](sc[j]) for j in range(len(sc))]
             plt.plot(sc, Y_p, color='g')        # 2d functions evaluated
             plt.plot(sc, self.Yp[i], color='b') # points used to make the 3d interpolation function
@@ -277,7 +276,6 @@ class AM:
         Y_p_nozzle = am_nozzle.nozzle_Y(sc, beta3)
         Y_p_impulse = am_impulse.nozzle_Y(sc, beta3) # for beta2 = beta3
         self.Y_p = (Y_p_nozzle + (beta2/beta3)**2 * (Y_p_impulse - Y_p_nozzle))*(5*tc)**(beta2/beta3)
-
 
 
 if __name__ == '__main__':
