@@ -45,7 +45,82 @@ class Deflection:
     def outlet_V(self):
         assert self.deflection_angle is not None, "you forgor to assign an angle 💀"
         return self.V_outlet
-    
+
+
+class V_triangle:
+    """ process:
+       1) take the inlet velocity
+       2) adjust it to the frame of reference of the cascade (be it rotor or stator)
+       3) calculate deflection
+       4) flow leaves (all outflows are relative to the cascade) """
+    def __init__(self, v_inlet: np.ndarray,
+                  v_blade: float,
+                    turn_angle: float):
+        """ v_inlet is the vector velocity of the incoming flow. Type must be array of dimension 2
+            v_blade is the scalar speed of the rotor
+            turn_angle is the cascade's turning angle in radians"""
+        
+        # velocity of the blade (positive means right to left motion of the blade)
+        # I expect rotors to be positive and stators to be negative
+
+        # type checking
+        assert isinstance(v_blade, float)
+        self.v_blade = v_blade
+        assert isinstance(v_inlet, np.ndarray)
+        self.abs_v_inlet = v_inlet
+        assert isinstance(v_inlet, np.ndarray), type(v_inlet)
+        assert isinstance(turn_angle, float)
+
+        # class input
+        self.turn_angle = turn_angle
+
+        # account for the speed of the blade AND the inlet velocity (vector sum)
+        self.rel_v_inlet = np.array([v_inlet[0] + v_blade,  
+                                     v_inlet[1]])
+
+        # calculate relative exit velocity
+        rotation_induced_angle = np.atan2(self.rel_v_inlet[0], self.rel_v_inlet[1]) # angle of attack relative to the blade
+        outlet_angle = rotation_induced_angle + turn_angle
+        self.v_outlet = np.array([v_inlet[1]*np.tan(outlet_angle),
+                                  v_inlet[1]])
+ 
+    def plot(self, title='velocity triangle', verbose=True):
+        """ for debugging/viewing
+            Note that velocity triangles are drawn upside down in here for convenience."""
+
+        print(f'prior frame of reference v: {np.sqrt(np.dot(self.abs_v_inlet, self.abs_v_inlet))}\n\
+        relative inlet velocity: {self.rel_v_inlet}\n\
+        outlet velocity: {self.v_outlet}')
+
+        # plot velocity vectors
+        # using plt.arrow because plt.quiver is comically broken
+        fig, ax = plt.subplots()
+        ax.arrow(0,                         0,                     self.abs_v_inlet[0],    self.abs_v_inlet[1],    color='k', head_width=5.0, head_length=5.0)
+        ax.arrow(0,                         0,                     self.rel_v_inlet[0],    self.rel_v_inlet[1],    color='r', head_width=5.0, head_length=5.0)
+        # ax.arrow(self.abs_v_inlet[0],       self.rel_v_inlet[1],   self.v_blade,           0,                      color='g', head_width=5.0, head_length=5.0)
+        # blade velocity = difference from relative inlet to absolute inlet
+        blade_vec = self.abs_v_inlet - self.rel_v_inlet
+        ax.arrow(self.rel_v_inlet[0], self.rel_v_inlet[1],
+                blade_vec[0], blade_vec[1],
+                color='g', head_width=5.0, head_length=5.0)
+
+        ax.arrow(0,                         0,                     self.v_outlet[0],       self.v_outlet[1],       color='b', head_width=5.0, head_length=5.0)
+        fig.suptitle(f'{title}') 
+
+        # legend (in order)
+        plt.legend([f'prior frame of reference v',
+                    f'relative inlet v',
+                    f'blade velocity (1d)',
+                    f'relative outlet velocity'])
+
+        # save graphs or view graphs depending on parameter "verbose"
+        if verbose:
+            plt.show()
+        elif not verbose:
+            plt.savefig(f'{title}.png')
+            plt.clf()
+
+
 class TurbineStageStreamline:
     def __init__(self, m_flow, eta_t, T01, p01, pressureRatio, RPM, ht_ratio=0.35, OD=0.4,phi=0.8,alpha3=10):
         self.m_flow = m_flow
@@ -142,7 +217,112 @@ class TurbineStageStreamline:
         # mach number at station 3 (outlet)
         self.M3 = self.C3 / np.sqrt(self.gamma * self.R * self.T3)
 
+    def calc_radial_equilibrium(self):
+        """Calculate blade angles at root and tip using free vortex design"""
 
+        # mean radius values
+        self.r_m = self.rm
+        self.h = self.A * (self.RPM / 60) / self.U # Blade heights at stations 1, 2, 3
+
+        # root and tip radii at station 2 (rotor inlet)
+        self.r_r = self.r_m - self.h[1] / 2 # root
+        self.r_t = self.r_m + self.h[1] / 2 # tip
+
+        # free vortex calculations
+        self.alpha2_root = np.rad2deg(np.arctan((self.r_m/self.r_r) * np.tan(np.deg2rad(self.alpha2))))
+        self.alpha2_tip = np.rad2deg(np.arctan((self.r_m/self.r_t) * np.tan(np.deg2rad(self.alpha2))))
+
+        self.beta2_root = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha2_root)) - (self.r_r / self.r_m) * (1 / self.phi)))
+        self.beta2_tip = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha2_tip)) - (self.r_t / self.r_m) * (1 / self.phi)))
+
+        # similarly for outlet angles
+        self.alpha3_root = np.rad2deg(np.arctan((self.r_m / self.r_r) * np.tan(np.deg2rad(self.alpha3))))
+        self.alpha3_tip = np.rad2deg(np.arctan((self.r_m / self.r_t) * np.tan(np.deg2rad(self.alpha3))))
+
+        self.beta3_root = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha3_root)) + (self.r_r / self.r_m) * (1 / self.phi)))
+        self.beta3_tip = np.rad2deg(np.arctan(np.tan(np.deg2rad(self.alpha3_tip)) + (self.r_t / self.r_m) * (1 / self.phi)))
+
+        # check reaction at root
+        self.Lambda_root = 1 - (np.tan(np.deg2rad(self.alpha2_root)) + np.tan(np.deg2rad(self.alpha3_root))) * self.phi / 2
+
+    def calc_blade_params(self):
+        """Calculate blade pitch, chord, and number of blades"""
+
+        # from Ainley-Mathieson correlations
+        # Stator (nozzle) blades
+        deflection_N = self.alpha2 # a1 = 0 to a2
+        self.s_c_N = 0.86 # from correlation chart for this deflection
+
+        # Rotor blades
+        deflection_R = self.beta2 + self.beta3
+        self.s_c_R = 0.83 # from correlation chart
+
+        # aspect ratio (h/c) - assume 3 for both
+        h_N = (self.h[0] + self.h[1]) / 2 # mean stator blade height
+        h_R = (self.h[1] + self.h[2]) / 2 # mean rotor blade height
+
+        c_N = h_N / 3 # stator chord length
+        c_R = h_R / 3 # rotor chord
+
+        # pitches
+        s_N = self.s_c_N * c_N
+        s_R = self.s_c_R * c_R
+
+        # number of blades
+        self.n_N = int(2 * np.pi * self.r_m / s_N) # stator blades
+        self.n_R = int(2 * np.pi * self.r_m / s_R) # rotor blades
+
+        # ensure prime number for rotor blades to avoid vibration
+        if not self.is_prime(self.n_R):
+            self.n_R = self.find_next_prime(self.n_R)
+
+    def calc_losses(self):
+        """Calculate profile, secondary, and tip clearance losses"""
+        # profile losses (simplified)
+        self.Y_p_N = 0.024 # from correlation for stator
+        self.Y_p_R = 0.032 # from correlation for rotor
+
+        # secondary losses
+        C_L_N = 2 * (self.s_c_N) * (np.tan(np.deg2rad(self.alpha2))) * np.cos(np.deg2rad(self.alpha2))
+        C_L_R = 2 * (self.s_c_R) * (np.tan(np.deg2rad(self.beta2)) + np.tan(np.deg2rad(self.beta3))) * np.cos(np.deg2rad((self.beta2 + self.beta3) / 2))
+
+        # tip clearance loss (rotor only)
+        k_h = 0.01 # 1% clearance
+        B = 0.5 # unshrouded
+        self.Y_k = B * k_h * (C_L_R / self.s_c_R)**2
+
+        # total losses
+        self.Y_N = self.Y_p_N + 0.014 * (C_L_N / self.s_c_N)**2 # stator
+        self.Y_R = self.Y_p_R + 0.014 * (C_L_R / self.s_c_R)**2 + self.Y_k # rotor
+
+        # convert to temperature-based coefficients
+        self.lambda_N = self.Y_N / (self.T01 / self.T2)
+        self.lambda_R = self.Y_R / (self.T03_rel / self.T3)
+
+        # calculate actual efficiency
+        self.eta_actual = 1 / (1 + 0.5*(self.Ca2/self.U)*(
+        (self.lambda_R/(np.cos(np.deg2rad(self.beta3))**2)) + 
+        (self.T3/self.T2)*(self.lambda_N/(np.cos(np.deg2rad(self.alpha2))**2))
+        ) / (np.tan(np.deg2rad(self.beta3)) + np.tan(np.deg2rad(self.alpha2)) - (self.U/self.Ca2)))
+
+    # helper functions
+    @staticmethod
+    def is_prime(self, n):
+        """Helper function: Check if current number is prime number"""
+        if n <= 1:
+            return False
+        for i in range(2, int(np.sqrt(n)) + 1):
+            if n % i == 0:
+                return False
+        return True
+
+    @staticmethod
+    def find_next_prime(self, n):
+        """Helper function: If current number isn't prime, find next closest prime number"""
+        while True:
+            n += 1
+            if self.is_prime(n):
+                return n 
 
     def get_velocities(self):
         return {
@@ -170,6 +350,54 @@ class TurbineStageStreamline:
             "delta_T0s" : f"{self.delta_T0s:.2f}",
             "DRXN" : f"{self.Lambda:.2f}"
         }
+    
+    def get_radial_equil(self):
+        return{
+            "Root_drxn" : f"{self.Lambda_root:.2f}"
+
+        }
+    def get_blade_params(self):
+        pass
+    def get_loss_coeffs(self):
+        pass
+    def plot_v_triangles(self):
+
+        alpha2_rad = np.deg2rad(self.alpha2)
+
+        V1_abs = np.array([0.0, self.C1]) # purely axial inlet velocity at station 1
+
+        V2_abs = np.array([
+            self.C2 * np.sin(alpha2_rad), # tangential
+            self.C2 * np.cos(alpha2_rad) # axial
+        ])
+
+        # blade speed at mean radius
+        blade_speed = float(self.U)
+
+        # cascade turning angle = beta2 - beta3 (in radians)
+        turn_angle = np.deg2rad(self.beta2 - self.beta3)
+
+        # create rotor velocity triangle object
+        vtrotor = V_triangle(
+            v_inlet=V2_abs,
+            v_blade=blade_speed,
+            turn_angle=turn_angle
+        )
+
+        # stator triangle info
+        # New stator triangle
+        alpha1_rad = 0  # axial inflow (α1=0)
+        stator_turn_angle = np.deg2rad(self.alpha2)  # stator turns flow to α2
+        
+        vstator = V_triangle(
+            v_inlet=V1_abs,
+            v_blade= 0.0,  # stator doesn't move
+            turn_angle=stator_turn_angle
+        )
+        
+        # plot results
+        vtrotor.plot(title="Rotor Velocity Triangle")
+        vstator.plot(title="Stator Velocity Triangle")
 
 class Turbine:
     def __init__(self):
@@ -194,14 +422,15 @@ def main():
     )
     # perform calculation
     stage.run_meanline_design()
-
     print(f'velocities:-----------\n'
           f'{dict_2_printable(stage.get_velocities())}\n\n'
           f'geometry:-------------\n'
           f'{dict_2_printable(stage.get_geometry())}\n\n'
           f'Thermodynamics:-------\n'
           f'{dict_2_printable(stage.get_thermo())}\n\n')
-
+    
+    # plot velocity triangles
+    stage.plot_v_triangles()
 
 if __name__ == "__main__":
     main()
