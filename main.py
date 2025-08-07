@@ -118,8 +118,6 @@ class Turbine:
     def __init__(self) -> None:
         # create radial cross sections
         # do the calcs for each
-
-        
         pass
 
 
