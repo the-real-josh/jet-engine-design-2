@@ -29,34 +29,6 @@ class Gas:
 air = Gas(1.40, 287.05)
 exhaust = Gas(1.333, 287.05) # placeholder values for hot gas
 
-class Deflection:
-
-    """Use 1D deflection of a moving gas"""
-    def __init__(self, V_inlet) -> None:
-        self.V_inlet = np.array(V_inlet, dtype=float)
-        self.deflection_angle = None # deg
-        self.initial_angle = 0
-
-    def input_deflection_angle(self, deflection_angle):
-        """Get user inputted angle"""
-        self.deflection_angle = deflection_angle
-    
-    def calc_outlet_v(self):
-        deflection_angle_rad = np.deg2rad(self.deflection_angle)
-        
-        theta_inlet = np.arctan2(self.V_inlet[1], self.V_inlet[0])
-        theta_outlet = theta_inlet - deflection_angle_rad
-        speed = norm(self.V_inlet)
-
-        self.V_outlet = np.array([
-            speed * np.cos(theta_outlet),
-            speed * np.sin(theta_outlet)
-        ])
-    
-    def outlet_V(self):
-        assert self.deflection_angle is not None, "you forgor to assign an angle 💀"
-        return self.V_outlet
-
 
 class V_triangle:
     """ process:
@@ -498,7 +470,7 @@ class TurbineStageStreamline:
 
 
         V1_abs = np.array([0.0, self.C1]) # purely axial inlet velocity at station 1
-        
+
         alpha2_rad = np.deg2rad(self.alpha2)
         V2_abs = np.array([
             self.C2 * np.sin(alpha2_rad), # tangential
@@ -523,8 +495,6 @@ class TurbineStageStreamline:
         # plot results
         vstator.plot(title="IGV Velocity Triangle")
         vtrotor.plot(title="Rotor Velocity Triangle")
-
-
 
 
 def main():
