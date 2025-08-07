@@ -399,7 +399,9 @@ class TurbineStageStreamline:
             },
             "drxn" : f"{self.Lambda:.3f}",
             "Root drxn" : f"{self.Lambda_root:.3f}",
-            "Tip drxn" : f"{(1 - self.Lambda_root):.3f}"
+            "Tip drxn" : f"{(1 - self.Lambda_root):.3f}",
+            "Temperature drop coeff" : f"{self.psi:.3f}",
+            "flow coefficient" : f"{self.phi:.3f}"
         }
 
     def get_blade_params(self):
