@@ -3,7 +3,18 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
 norm = np.linalg.norm
-dict_2_printable = lambda k: '\n'.join([f'{keys}: {vals}' for keys,vals in zip(k.keys(), k.values())])
+# dict_2_printable = lambda k: '\n'.join([f'{keys}: {vals}' for keys,vals in zip(k.keys(), k.values())])
+
+# output printing function
+def dict_2_printable(data, indent=0):
+    lines = []
+    for key, value in data.items():
+        if isinstance(value, dict):
+            lines.append("  " * indent + f"{key}:")
+            lines.append(dict_2_printable(value, indent+1))
+        else:
+            lines.append("  " * indent + f"{key}: {value}")
+    return '\n'.join(lines)
 
 
 class Gas:
@@ -257,27 +268,27 @@ class TurbineStageStreamline:
 
         # from Ainley-Mathieson correlations
         # Stator (nozzle) blades
-        deflection_N = self.alpha2 # a1 = 0 to a2
+        self.deflection_N = self.alpha2 # a1 = 0 to a2
         self.s_c_N = 0.86 # from correlation chart for this deflection
 
         # Rotor blades
-        deflection_R = self.beta2 + self.beta3
+        self.deflection_R = self.beta2 - self.beta3
         self.s_c_R = 0.83 # from correlation chart
 
         # aspect ratio (h/c) - assume 3 for both
-        h_N = (self.h[0] + self.h[1]) / 2 # mean stator blade height
-        h_R = (self.h[1] + self.h[2]) / 2 # mean rotor blade height
+        self.h_N = (self.h[0] + self.h[1]) / 2 # mean stator blade height
+        self.h_R = (self.h[1] + self.h[2]) / 2 # mean rotor blade height
 
-        c_N = h_N / 3 # stator chord length
-        c_R = h_R / 3 # rotor chord
+        self.c_N = self.h_N / 3 # stator chord length
+        self.c_R = self.h_R / 3 # rotor chord
 
         # pitches
-        s_N = self.s_c_N * c_N
-        s_R = self.s_c_R * c_R
+        self.s_N = self.s_c_N * self.c_N
+        self.s_R = self.s_c_R * self.c_R
 
         # number of blades
-        self.n_N = int(2 * np.pi * self.r_m / s_N) # stator blades
-        self.n_R = int(2 * np.pi * self.r_m / s_R) # rotor blades
+        self.n_N = int(2 * np.pi * self.r_m / self.s_N) # stator blades
+        self.n_R = int(2 * np.pi * self.r_m / self.s_R) # rotor blades
 
         # ensure prime number for rotor blades to avoid vibration
         if not TurbineStageStreamline.is_prime(self.n_R):
@@ -290,29 +301,26 @@ class TurbineStageStreamline:
         self.Y_p_R = 0.032 # from correlation for rotor
 
         # secondary losses
-        C_L_N = 2 * (self.s_c_N) * (np.tan(np.deg2rad(self.alpha2))) * np.cos(np.deg2rad(self.alpha2))
-        C_L_R = 2 * (self.s_c_R) * (np.tan(np.deg2rad(self.beta2)) + np.tan(np.deg2rad(self.beta3))) * np.cos(np.deg2rad((self.beta2 + self.beta3) / 2))
+        self.C_L_N = 2 * (self.s_c_N) * (np.tan(np.deg2rad(self.alpha2))) * np.cos(np.deg2rad(self.alpha2))
+        self.C_L_R = 2 * (self.s_c_R) * (np.tan(np.deg2rad(self.beta2)) + np.tan(np.deg2rad(self.beta3))) * np.cos(np.deg2rad((self.beta2 + self.beta3) / 2))
 
         # tip clearance loss (rotor only)
         k_h = 0.01 # 1% clearance
         B = 0.5 # unshrouded
-        self.Y_k = B * k_h * (C_L_R / self.s_c_R)**2
+        self.Y_k = B * k_h * (self.C_L_R / self.s_c_R)**2
 
         # total losses
-        self.Y_N = self.Y_p_N + 0.014 * (C_L_N / self.s_c_N)**2 # stator
-        self.Y_R = self.Y_p_R + 0.014 * (C_L_R / self.s_c_R)**2 + self.Y_k # rotor
+        self.Y_N = self.Y_p_N + 0.014 * (self.C_L_N / self.s_c_N)**2 # stator
+        self.Y_R = self.Y_p_R + 0.014 * (self.C_L_R / self.s_c_R)**2 + self.Y_k # rotor
 
         # calculate relative velocities and temperatures
-        V2 = self.Ca2 / np.cos(np.deg2rad(self.beta2))  # Relative velocity at rotor inlet
-        V3 = self.Ca3 / np.cos(np.deg2rad(self.beta3))  # Relative velocity at rotor outlet
+        self.V2_rel = self.Ca2 / np.cos(np.deg2rad(self.beta2))  # Relative velocity at rotor inlet
+        self.V3_rel = self.Ca3 / np.cos(np.deg2rad(self.beta3))  # Relative velocity at rotor outlet
         
         # relative total temperatures
-        self.T02_rel = self.T01 - (self.C1**2 - V2**2)/(2*self.cp)  # Rotor inlet
-        self.T03_rel = self.T03 - (self.C3**2 - V3**2)/(2*self.cp)  # Rotor outlet
+        self.T02_rel = self.T01 - (self.C1**2 - self.V2_rel**2)/(2*self.cp)  # Rotor inlet
+        self.T03_rel = self.T03 - (self.C3**2 - self.V3_rel**2)/(2*self.cp)  # Rotor outlet
         
-        # store relative velocities
-        self.V2_rel = V2
-        self.V3_rel = V3
 
         # convert to temperature-based coefficients
         self.lambda_N = self.Y_N / (self.T01 / self.T2)
@@ -345,48 +353,147 @@ class TurbineStageStreamline:
 
     # getter functions for outputting data
 
-
     def get_velocities(self):
+        """Returns all velocity components"""
         return {
-            "Ca2" : f"{self.Ca2:.2f}",
-            "C2" : f"{self.C2:.2f}",
-            "alpha2" : f"{self.alpha2:.2f}",
-            "beta2" : f"{self.beta2:.2f}",
-            "beta3" : f"{self.beta3:.2f}"
+            "axial velocities" : {
+                "nozzle inlet [m/s]" : f"{self.Ca1:.1f}",
+                "rotor inlet [m/s]" : f"{self.Ca2:.1f}",
+                "rotor outlet [m/s]" : f"{self.Ca3:.1f}"
+            },
+            "absolute velocities" : {
+                "nozzle inlet [m/s]" : f"{self.C1:.1f}",
+                "rotor inlet [m/s]" : f"{self.C2:.1f}",
+                "rotor outlet [m/s]" : f"{self.C3:.1f}"
+            },
+            "relative velocities" : {
+                "rotor inlet [m/s]" : f"{self.V2_rel:.1f}",
+                "rotor outlet [m/s]" : f"{self.V3_rel:.1f}"
+            },
+            "blade speed [m/s]" : f"{self.U:.1f}",
+            "outlet mach number" : f"{self.M3:.2f}"
         }
     
     def get_geometry(self):
         return {
             "hub_diameter" : f"{self.hub_dia:.2f}",
             "mean_radius" : f"{self.rm:.2f}",
-            "U" : f"{self.U:.2f}",
-            "annulus_area" : f"{self.A2:.2f}",
-            "flare_angle": f"{self.annulus_flare_angle:.1f} deg"
+            "mean radius [m]" : f"{self.r_m:.4f}",
+            "mean stator blade height [m]" : f"{self.h_N:.4f}",
+            "mean rotor blade height [m]" : f"{self.h_R:.4f}",
+            "station 1": {
+                "hub radius [m]" : f"{self.r_r[0]:.4f}",
+                "tip radius [m]" : f"{self.r_t[0]:.4f}",
+                "radius ratio" : f"{self.radius_ratios[0]:.3f}",
+                "annulus_area [m^2]" : f"{self.A1:.2f}",
+                "blade height [m]" : f"{self.h[0]:.4f}"
+
+            },
+            "station 2" : {
+                "hub radius [m]" : f"{self.r_r[1]:.4f}",
+                "tip radius [m]" : f"{self.r_t[1]:.4f}",
+                "radius ratio" : f"{self.radius_ratios[1]:.3f}",
+                "annulus_area [m^2]" : f"{self.A2:.2f}",
+                "blade height [m]" : f"{self.h[1]:.4f}"
+            },
+            "station 3" : {
+                "hub radius [m]" : f"{self.r_r[2]:.4f}",
+                "tip radius [m]" : f"{self.r_t[2]:.4f}",
+                "radius ratio" : f"{self.radius_ratios[2]:.3f}",
+                "annulus_area [m^2]" : f"{self.A3:.2f}",
+                "blade height [m]" : f"{self.h[2]:.4f}",
+            },
+            "annulus flare angle [deg]" : f"{self.annulus_flare_angle:.1f}"
+
         }
     
     def get_thermo(self):
         """Returns thermodynamic properties at all stations"""
         return {
-            "Plane": ["1", "2", "3"],
-            "pressure [bar]": [f"{self.p1/1e5:.3f}", f"{self.p2/1e5:.3f}", f"{self.p3/1e5:.3f}"],
-            "temperature [K]": [f"{self.T1:.1f}", f"{self.T2:.1f}", f"{self.T3:.1f}"],
-            "density [kg/m³]": [f"{self.rho1:.3f}", f"{self.rho2:.3f}", f"{self.rho3:.3f}"],
-            "annulus area [m²]": [f"{self.A1:.4f}", f"{self.A2:.4f}", f"{self.A3:.4f}"],
-            "mean radius [m]": [f"{self.rm:.3f}", f"{self.rm:.3f}", f"{self.rm:.3f}"],
-            "tip to root radius ratios": [f"{self.radius_ratios[0]:.2f}", f"{self.radius_ratios[1]:.2f}", f"{self.radius_ratios[2]:.2f}"],
-            "blade height [m]": [f"{self.h[0]:.4f}", f"{self.h[1]:.4f}", f"{self.h[2]:.4f}"]
-
+            "Station 1" : {
+                "pressure [bar]" : f"{self.p1/1e5:.3f}",
+                "temperature [K]" : f"{self.T1:.1f}",
+                "density [kg/m^3]" : f"{self.rho1:.3f}",
+            },
+            "Station 2" : {
+                "pressure [bar]" : f"{self.p2/1e5:.3f}",
+                "temperature [K]" : f"{self.T2:.1f}",
+                "density [kg/m^3]" : f"{self.rho2:.3f}",
+            },
+            "Station 3" : {
+                "pressure [bar]" : f"{self.p3/1e5:.3f}",
+                "temperature [K]" : f"{self.T3:.1f}",
+                "density [kg/m^3]" : f"{self.rho3:.3f}",
+            },
+            "drxn" : f"{self.Lambda:.3f}",
+            "Root drxn" : f"{self.Lambda_root:.3f}",
+            "Tip drxn" : f"{(1 - self.Lambda_root):.3f}"
         }
-    
-    def get_radial_equil(self):
-        return{
-            "Root_drxn" : f"{self.Lambda_root:.2f}"
 
-        }
     def get_blade_params(self):
-        pass
+        """Returns blade parameters"""
+        return {
+            "geometry" : {
+                "stator count" : getattr(self,'n_N','N/A'),
+                "rotor count" : getattr(self,'n_R', 'N/A'),
+                "stator chord [m]" : f"{getattr(self,'c_N',0):.4f}",
+                "rotor chord [m]" : f"{getattr(self,'c_R',0):.4f}"
+            },
+            "dimensionless parameters" : {
+                "stator s/c" : "0.86",
+                "rotor s/c" : "0.83",
+                "stator h/c" : f"{(self.h[0] + self.h[1])/2/self.c_N:.1f}",
+                "rotor h/c" : f"{(getattr(self,'h',[0,0,0])[1] + getattr(self,'h',[0,0,0])[2])/2/getattr(self,'c_R',1):.1f}"
+            },
+            "Stator angles" : {
+                "a1 [deg]" : "0",
+                "a2 mean [deg]" : f"{self.alpha2:.2f}",
+                "a2 at root [deg]" : f"{self.alpha2_root:.2f}",
+                "a2 at tip [deg]" : f"{self.alpha2_tip:.2f}",
+                "deflection [deg]" : f"{self.deflection_N:.2f}",
+            },
+            "Rotor angles" : {
+                "b2 mean [deg]" : f"{self.beta2:.2f}",
+                "b2 at root [deg]" : f"{self.beta2_root:.2f}",
+                "b2 at tip [deg]" : f"{self.beta2_tip:.2f}",
+                "b3 mean [deg]" : f"{self.beta3:.2f}",
+                "b3 at root [deg]" : f"{self.beta3_root:.2f}",
+                "b3 at tip [deg]" : f"{self.beta3_tip:.2f}",
+                "a3 mean [deg]" : f"{self.alpha3:.2f}",
+                "a3 at root [deg]" : f"{self.alpha3_root:.2f}",
+                "a3 at tip [deg]" : f"{self.alpha3_tip:.2f}",
+                "deflection [deg]" : f"{self.deflection_R:.2f}"
+            },
+            
+            
+            "tip clearance" : "1 % blade height"
+        }
+
     def get_loss_coeffs(self):
-        pass
+        return {
+            "profile loss" : {
+                "stator Y_p" : f"{self.Y_p_N:.4f}",
+                "rotor Y_p" : f"{self.Y_p_R:.4f}",
+            },
+            "secondary loss" : {
+                "stator C_L" : f"{self.C_L_N:.4f}",
+                "rotor C_L" : f"{self.C_L_R:.4f}"
+            },
+            "tip clearance loss (rotor only)" : {
+                "rotor Y_k" : f"{self.Y_k:.4f}"
+            },
+            "total loss" : {
+                "stator Y_N" : f"{self.Y_N:.4f}",
+                "rotor Y_N" : f"{self.Y_R:.4f}"
+            },
+            "equivalent losses" : {
+                "stator lambda_N" : f"{self.lambda_N:.3f}",
+                "rotor lambda_R" : f"{self.lambda_R:.3f}"
+            },
+            "stage efficiency" : f"{self.eta_actual:.3f}",
+            "target efficiency" : f"{self.eta_t:.3f}"
+
+        }
     def plot_v_triangles(self):
 
 
@@ -441,12 +548,17 @@ def main():
     stage.calc_radial_equilibrium()
     stage.calc_blade_params()
     stage.calc_losses()
-    print(f'velocities:-----------\n'
-          f'{dict_2_printable(stage.get_velocities())}\n\n'
-          f'geometry:-------------\n'
-          f'{dict_2_printable(stage.get_geometry())}\n\n'
-          f'Thermodynamics:-------\n'
-          f'{dict_2_printable(stage.get_thermo())}\n\n')
+    print(f'velocities:----------\n'
+        f'{dict_2_printable(stage.get_velocities())}\n\n'
+        f'geometry:-------------\n'
+        f'{dict_2_printable(stage.get_geometry())}\n\n'
+        f'thermodynamics:-------\n'
+        f'{dict_2_printable(stage.get_thermo())}\n\n'
+        f'blade parameters------\n'
+        f'{dict_2_printable(stage.get_blade_params())}\n\n'
+        f'loss coefficients-----\n'
+        f'{dict_2_printable(stage.get_loss_coeffs())}\n\n'
+    )
     
     # plot velocity triangles
     stage.plot_v_triangles()
