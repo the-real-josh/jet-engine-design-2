@@ -97,10 +97,50 @@ class TurbineStageStreamline:
         self.Ca2 = self.U * self.phi # axial velocity at rotor exit
         self.C2 = self.Ca2 / np.cos(np.deg2rad(self.alpha2)) # absolute velocity at rotor exit
         self.T2 = self.T01 - self.C2**2 / (2 * self.cp) # static temp at rotor exit
-        self.T2Prime = self.T2 - 0.05 * self.C2**2 / (2 * self.cp) # T2 after nozzle loss ( lambda_N = 0.05)
+        self.lambda_N = 0.05 # nozzle loss coeff
+        self.T2Prime = self.T2 - self.lambda_N * self.C2**2 / (2 * self.cp) # T2 after nozzle loss ( lambda_N = 0.05)
         self.p2 = self.p01 * (self.T2Prime / self.T01)**(self.gamma / (self.gamma - 1)) # static pressure at station 2
         self.rho2 = self.p2 / (self.R * self.T2) # density at station 2
         self.A2 = self.m_flow / (self.rho2 * self.Ca2) # annulus area needed to pass flow at station 2
+        
+        # station 1 (inlet) axial velocity
+        self.Ca3 = self.Ca2 # axial velocity assumed constant through turbine
+
+        # station 1 velocity components
+        self.Ca1 = self.Ca3 / np.cos(np.deg2rad(self.alpha3))
+        self.C1 = self.Ca1 # assuming purely axial velocity at inlet (no swirl)
+        self.C3 = self.C1 # velocity magnitude at outlet assumed equal to inlet
+
+        # kinetic energy term for inlet/outlet velocity
+        self.KE = self.C1**2 / (2 * self.cp)
+
+        # static temp at inlet considering kinetic energy
+        self.T1 = self.T01 - self.KE
+        self.p1 = self.p01 * (self.T1 / self.T01)**(self.gamma / (self.gamma - 1))
+        self.rho1 = self.p1 / (self.R * self.T1)
+        self.A1 = self.m_flow / (self.rho1 * self.Ca1)
+
+        # outlet static temp and pressure
+        self.T3 = self.T03 - self.KE
+        self.p3 = self.p03 * (self.T3 / self.T03)**(self.gamma / (self.gamma - 1))
+        self.rho3 = self.p3 / (self.R * self.T3)
+        self.A3 = self.m_flow / (self.rho3 * self.Ca3)
+
+        # mean blade speed
+        self.Um = self.U
+
+        # annulus area array for stations 1,2,3
+        self.A = np.array([self.A1, self.A2, self.A3])
+
+        # blade height estimation (h) at each station
+        self.h = self.A * N / self.Um 
+
+        # radius ratio between blade heights
+        self.r_ratio = (self.rm + self.h / 2) / (self.rm - self.h / 2)
+
+        # mach number at station 3 (outlet)
+        self.M3 = self.C3 / np.sqrt(self.gamma * self.R * self.T3)
+
 
 
     def get_velocities(self):
@@ -126,7 +166,8 @@ class TurbineStageStreamline:
             "T03" : f"{self.T03:.2f}",
             "p01" : f"{self.p01:.2f}",
             "p03" : f"{self.p03:.2f}",
-            "delta_T0s" : f"{self.delta_T0s:.2f}"
+            "delta_T0s" : f"{self.delta_T0s:.2f}",
+            "DRXN" : f"{self.Lambda:.2f}"
         }
 
 class Turbine:
