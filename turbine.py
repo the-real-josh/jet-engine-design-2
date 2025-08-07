@@ -389,46 +389,35 @@ class TurbineStageStreamline:
         pass
     def plot_v_triangles(self):
 
-        alpha2_rad = np.deg2rad(self.alpha2)
 
         V1_abs = np.array([0.0, self.C1]) # purely axial inlet velocity at station 1
-
+        
+        alpha2_rad = np.deg2rad(self.alpha2)
         V2_abs = np.array([
             self.C2 * np.sin(alpha2_rad), # tangential
             self.C2 * np.cos(alpha2_rad) # axial
         ])
 
-        # blade speed at mean radius
-        blade_speed = float(self.U)
-
-        # cascade turning angle = beta2 - beta3 (in radians)
-        turn_angle = np.deg2rad(self.beta2 - self.beta3)
+        # stator triangle info
+        # New stator triangle (axial inflow (α1=0))
+        vstator = V_triangle(
+            v_inlet=V1_abs,
+            v_blade= 0.0,                        # stator doesn't move
+            turn_angle= np.deg2rad(self.alpha2)  # stator turns flow to α2
+        )
 
         # create rotor velocity triangle object
         vtrotor = V_triangle(
             v_inlet=V2_abs,
-            v_blade=blade_speed,
-            turn_angle=turn_angle
+            v_blade=float(self.U),                             # blade speed at mean radius
+            turn_angle=np.deg2rad(self.beta2 - self.beta3)     # cascade turning angle = beta2 - beta3 (in radians)
         )
 
-        # stator triangle info
-        # New stator triangle
-        alpha1_rad = 0  # axial inflow (α1=0)
-        stator_turn_angle = np.deg2rad(self.alpha2)  # stator turns flow to α2
-        
-        vstator = V_triangle(
-            v_inlet=V1_abs,
-            v_blade= 0.0,  # stator doesn't move
-            turn_angle=stator_turn_angle
-        )
-        
         # plot results
+        vstator.plot(title="IGV Velocity Triangle")
         vtrotor.plot(title="Rotor Velocity Triangle")
-        vstator.plot(title="Stator Velocity Triangle")
 
-class Turbine:
-    def __init__(self):
-        pass
+
 
 
 def main():
